@@ -343,18 +343,3 @@ void loop()
   // printf("working...\n");
   LoRaWAN.sleep();
 }
-/*
-NNSXS.NNOQI5X6WXKNV45DOI6CY33CJR6TVTIQRNYVMXY.WPZEXJOYDIT7MRTZRVLHSY5GXRILU5Y6CVFQXMGCQNFP4EFOEZWA
-
-uplink_message
-uplink_normalized
-join_accept
-downlink_ack
-downlink_nack
-downlink_sent
-downlink_failed
-downlink_queued
-downlink_queue_invalidated
-location_solved
-service_data
-*/
