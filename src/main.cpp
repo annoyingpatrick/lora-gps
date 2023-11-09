@@ -20,7 +20,8 @@ const int SLEEP_TIME_BETWEEN_EVENTS_MS = 10000;
 const bool LORA_OTAA = true;
 
 // For OTAA.
-uint8_t devEui[8] = {0};
+// uint8_t devEui[8] = {0x83, 0xfa, 0x12, 0xf4, 0x00, 0x00, 0x1c, 0x10};
+uint8_t devEui[8] = {0x83, 0xFA, 0x12, 0xF4, 0x00, 0x00, 0xC8, 0x10};
 
 // These are only used for ABP.
 uint8_t nwkSKey[16] = {0};
@@ -175,103 +176,32 @@ void display_status(bool lora_joined, bool gps_found)
 void prepareTxFrame(void)
 {
   // We are going to send 20 bytes.
-  appDataSize = 20;
-
-  uint32_t age = 9999999;
-  int gps_count = 0;
-
-  // Wait until we have fresh data.
-  while (age > 1000)
-  {
-    // Read in from the GPS and use the library to parse the message.
-    while (gpsSerial.available() > 0)
-    {
-      gps.encode(gpsSerial.read());
-    }
-
-    age = gps.location.age();
-    if (age > 1000)
-    {
-      gps_count += 1;
-      if (gps_count > 3)
-      {
-        gps_locked = false;
-      }
-      display_status(true, gps_locked);
-      continue;
-    }
-
-    gps_locked = true;
-
-    // Retrieve the GPS location in billionths of degrees.
-    int16_t lat_whle, lng_whle;
-    uint32_t lat_frac, lng_frac;
-    lat_whle = (gps.location.rawLat().negative ? -1 : 1) * ((int16_t)gps.location.rawLat().deg);
-    lat_frac = gps.location.rawLat().billionths;
-    lng_whle = (gps.location.rawLng().negative ? -1 : 1) * ((int16_t)gps.location.rawLng().deg);
-    lng_frac = gps.location.rawLng().billionths;
-
-    // Retrieve properties of the GPS reading.
-    int16_t altitude, hdop;
-    uint8_t satellites;
-    altitude = (int16_t)gps.altitude.value();
-    hdop = (int16_t)gps.hdop.value();
-    satellites = (uint8_t)gps.satellites.value();
-
-    printf("Lat: %i+%i/1000000000, Lng: %i+%i/1000000000, Age: %i\n", lat_whle, lat_frac, lng_whle, lng_frac, age);
-    printf("Altitude (cm): %i, HDOP: %i, #satellites: %i\n", altitude, hdop, satellites);
-
-    // Create our packet structure.
-    appData[0] = (1 << 7); // our GPS
-    // Latitude
-    appData[1] = (lat_whle >> 0) & 0xFF;
-    appData[2] = (lat_whle >> 8) & 0xFF;
-    appData[3] = (lat_frac >> 0) & 0xFF;
-    appData[4] = (lat_frac >> 8) & 0xFF;
-    appData[5] = (lat_frac >> 16) & 0xFF;
-    appData[6] = (lat_frac >> 24) & 0xFF;
-    // Longitude
-    appData[7] = (lng_whle >> 0) & 0xFF;
-    appData[8] = (lng_whle >> 8) & 0xFF;
-    appData[9] = (lng_frac >> 0) & 0xFF;
-    appData[10] = (lng_frac >> 8) & 0xFF;
-    appData[11] = (lng_frac >> 16) & 0xFF;
-    appData[12] = (lng_frac >> 24) & 0xFF;
-    // Altitude
-    appData[13] = (altitude >> 0) & 0xFF;
-    appData[14] = (altitude >> 8) & 0xFF;
-    // Horizontal Dim. of Precision (HDOP)
-    appData[15] = (hdop >> 0) & 0xFF;
-    appData[16] = (hdop >> 8) & 0xFF;
-    // Satellites
-    appData[17] = satellites;
-    // Count
-    appData[18] = (count >> 0) & 0xFF;
-    appData[19] = (count >> 8) & 0xFF;
-
-    for (int i = 0; i < appDataSize; i++)
-    {
-      Serial.print(appData[i], HEX);
-      Serial.print(" ");
-    }
-    Serial.println("");
-
-    // Display the GPS data to the OLED.
-    int32_t lat, lng;
-    lat = (((int32_t)lat_whle) * 1000000) + ((lat_whle ? -1 : 1) * ((int32_t)(lat_frac / 1000)));
-    lng = (((int32_t)lng_whle) * 1000000) + ((lng_whle ? -1 : 1) * ((int32_t)(lng_frac / 1000)));
-    display_gps(lat, lng);
-  }
+  appDataSize = 8;
+  float temperature = temperatureRead();
+  int64_t tempToSend = (int64_t)(temperature * 1000000);
+  appData[0] = (tempToSend >> 56) & 0xFF;
+  appData[1] = (tempToSend >> 48) & 0xFF;
+  appData[2] = (tempToSend >> 40) & 0xFF;
+  appData[3] = (tempToSend >> 32) & 0xFF;
+  appData[4] = (tempToSend >> 24) & 0xFF;
+  appData[5] = (tempToSend >> 16) & 0xFF;
+  appData[6] = (tempToSend >> 8) & 0xFF;
+  appData[7] = tempToSend & 0xFF;
+  Serial.println(temperatureRead());
 }
 
 static void send_packet(void)
 {
-  send_packet();
+  prepareTxFrame();
 
   // Since we are sending a packet, increment our counter.
-  count += 1;
+  count += 0;
 
   LoRaWAN.send(true, confirmedNbTrials, appPort);
+  printf("packet sent\n");
+  // display.clear();
+  // display.drawString(64, 5, "packet sent1");
+  // display.display();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -408,5 +338,23 @@ void loop()
 {
   // All operations are event based, so all we do here is
   // let the LoRaWAN stack handle events or go to sleep.
+  // display.clear();
+  // display.drawString(64, 5, "packet sent2");
+  // printf("working...\n");
   LoRaWAN.sleep();
 }
+/*
+NNSXS.NNOQI5X6WXKNV45DOI6CY33CJR6TVTIQRNYVMXY.WPZEXJOYDIT7MRTZRVLHSY5GXRILU5Y6CVFQXMGCQNFP4EFOEZWA
+
+uplink_message
+uplink_normalized
+join_accept
+downlink_ack
+downlink_nack
+downlink_sent
+downlink_failed
+downlink_queued
+downlink_queue_invalidated
+location_solved
+service_data
+*/
